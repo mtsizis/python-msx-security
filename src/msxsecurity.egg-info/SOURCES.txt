@@ -1,0 +1,11 @@
+MANIFEST.in
+README.md
+setup.cfg
+setup.py
+src/msxsecurity/__init__.py
+src/msxsecurity/msxsecurity.py
+src/msxsecurity.egg-info/PKG-INFO
+src/msxsecurity.egg-info/SOURCES.txt
+src/msxsecurity.egg-info/dependency_links.txt
+src/msxsecurity.egg-info/requires.txt
+src/msxsecurity.egg-info/top_level.txt

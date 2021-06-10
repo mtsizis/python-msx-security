@@ -1,1 +1,154 @@
 # python-msx-security
+* [Introduction](#introduction)
+* [Prerequisites](#prerequisites)
+* [Installation](#installation)
+* [Security Clients](#security-clients)
+* [Getting an Access Token](#getting-an-access-token)
+* [Swapping Access Tokens for Security Contexts](#swapping-access-tokens-for-security-contexts)
+* [Caching Results for Performance](#caching-results-for-performance)
+* [Defeating the SSL Certificate](#defeating-the-ssl-certificate)
+
+
+## Introduction
+This module enables an application to swap an MSX access token for an MSX security context. The security context contains details of which permissions a user has, and which tenants they can access. This information makes it possible for a service to implement RBAC (role based access control) and tenancy rules.
+
+<br>
+
+## Prerequisites
+- python3
+- pip3
+- MSX confidential security client
+
+<br>
+
+## Installation
+### Command Line
+To install `msxsecurity` from the command line run the command below.
+```bash
+$ pip3 install git+https://github.com/CiscoDevNet/python-msx-security
+```
+
+### requirements.txt
+To include `msxsecurity` as a dependency in `requirements.txt include it as shown:
+```bash
+msxsecurity @ git+https://github.com/CiscoDevNet/python-msx-security
+```
+
+<br>
+
+## Security Clients
+You must create a confidential security client in MSX before you can use this module. You can either do this through `Settings->SSO Configurations->Add SSO Clients` or using Swagger. To find the correct Swagger page click on your username in the top left-hand corner, select `Account Settings`, scroll down and click `Swagger UI`, then select `IDM Microservice`. Make a security client using `POST /idm/api/v2/clientsecurity` and the payload below.
+
+Note it is important that you update `clientId` to be unique and `clientSecret` to be something secure. Keep the client secret in secure store like `Vault`, and only ever send it over a secure back channel. When your service is deployed inside MSX, you can use it to implement RBAC and tenancy. However, embedding the client secret in a web or mobile application is not appropriate.
+```json
+{
+    "clientId": "my-private-client",
+    "clientSecret": "make-up-a-private-client-secret-and-keep-it-safe",
+    "grantTypes": [
+        "password", 
+        "urn:cisco:nfv:oauth:grant-type:switch-tenant", 
+        "urn:cisco:nfv:oauth:grant-type:switch-user"
+    ],
+    "maxTokensPerUser": -1,
+    "useSessionTimeout": false,
+    "resourceIds": [],
+    "scopes": [
+        "address",
+        "read",
+        "phone",
+        "openid",
+        "profile",
+        "write",
+        "email",
+        "tenant_hierarchy", 
+        "token_details"
+    ],
+    "autoApproveScopes": [
+        "address",
+        "read",
+        "phone",
+        "openid",
+        "profile",
+        "write",
+        "email",
+        "tenant_hierarchy", 
+        "token_details"
+    ],
+    "authorities": [
+        "ROLE_USER"
+    ],
+    "accessTokenValiditySeconds": 9000,
+    "refreshTokenValiditySeconds": 18000,
+    "additionalInformation": {
+    }
+}
+```
+
+<br>
+
+## Getting an Access Token
+If you are just kicking the tires you can sign in to your Cisco MSX Portal and make any Swagger request to get an access token. You can grab the `Bearer` token from the `Authorization` header and plug it into the example.
+```shell
+curl -X GET "http://localhost:9103/idm/api/v8/users/current" -H  "accept: application/json" -H  "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFuZDBXYk9mY2cifQ.eyJzdWIiOiJzdXBlcnVzZXIiLCJsYXN0TmFtZSI6IlVzZXIiLCJ1c2VyX25hbWUiOiJzdXBlcnVzZXIiLCJyb2xlcyI6WyJTVVBFUlVTRVIiXSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo5MTAzL2lkbSIsImF1dGhvcml0aWVzIjpbIlJPTEVfQ0xJRU5UIl0sImNsaWVudF9pZCI6Im5mdi1jbGllbnQiLCJmaXJzdE5hbWUiOiJTdXBlciIsInNjb3BlIjpbImFkZHJlc3MiLCJlbWFpbCIsIm9wZW5pZCIsInBob25lIiwicHJvZmlsZSIsInJlYWQiLCJ3cml0ZSJdLCJ0ZW5hbnRJZCI6ImQ5MDNiNzgwLWMyNGEtMTFlYi05NDk5LWY5MDYyYzI0MGE0MCIsImV4cCI6MTYyMzE4NTk0MywiaWF0IjoxNjIzMTc2OTQzLCJqdGkiOiJiYTg4NmRjNy1kYmJjLTRlYWYtODQxYy1iNGFhOGFmM2Y3M2YiLCJlbWFpbCI6Im5vcmVwbHlAY2lzY28uY29tIn0.D5CUvsDVIL5qHIHwYPHKd939SsOhDzQOf8KWYav9biIOmRgq51_I47eqKsNx0pPzTjFvLoN8uCryvS6dImG4I-nYun5ZoKvEiZjvBCoty5NgfWDIrQb7DPyDGUlRbC4Ar6IAJ49eqm1w44el-iQuDuZpK-OA9bqiXffngFapKr_2VCL07vq-syZ8w9mjSyO_2XSzpQ0pDOWrALkvGD82B1w3919q9_DAZLpq7gJkRDa4_tZ2HHfwxuoQ14lbH1D4QrwqZFTio1q0Io0nBwgcy7i4CCBvH4Ygsbk00PrQ8ktrJ_Ul2u-v9qvGiQ8QtKCdxLWdBi4CMNtbF_o_7B-8Mw"
+```
+
+Similary when a request comes into your service you can grab the token from the headers, then `check` that token if you need to enforce RBAC or Tenancy rules. 
+
+
+<br>
+
+## Swapping Access Tokens for Security Contexts
+Once have created your confidential MSX security client, you can use the Python script below to get the list of tenants and permissions available for a given MSX access token. Make sure you update the example with your:
+* MSX access token
+* MSX host name
+* MSX private client id
+* MSX private client secret
+
+```python
+from msxsecurity.msxsecurity import MSXSecurity, MSXSecurityConfig
+
+token = "my-msx-access-token"
+config = MSXSecurityConfig(
+    sso_url="https://my-msx-hostname/idm",
+    client_id="my-private-client",
+    client_secret="make-up-a-private-client-secret-and-keep-it-safe")
+
+security = MSXSecurity(config)
+security_context = security.check_token(token)
+if security_context and security_context.active:
+    print("tenants:")
+    print(security_context.assigned_tenants)
+    print("permissions:")
+    print(security_context.permissions)
+else:
+    print("Invalid MSX access token.")
+```
+
+<br>
+
+## Caching Results for Performance
+If you expect your API to get heavy use then you can enable a TTL cache by adding two more arguments to `MSXSecurityConfig` as shown:
+```python
+.
+.
+.
+config = MSXSecurityConfig(
+    sso_url="https://my-msx-hostname/idm",
+    client_id="my-private-client",
+    client_secret="make-up-a-private-client-secret-and-keep-it-safe",
+    cache_enabled = True,
+    cache_ttl_seconds=300)
+.
+.
+.
+```
+
+It is the responsibility of the caller to fetch a new security context if it goes stale before it expires out of the cache. This could happen if a user lost a role or access to a tenant was removed after the You can manage this by:
+* setting a short TTL
+* clearing the cache with `security.clear_cache()`
+* forcing an individual refresh with `security.check_token(my_access_token, force_refresh=True)`
+
+<br>
+
+## Defeating the SSL Certificate
+If your MSX environment has a self-signed HTTPS certificate, you may need to defeat the SSL certificate during development [(help me)](https://urllib3.readthedocs.io/en/latest/advanced-usage.html?highlight=disable_warnings#tls-warnings). Note that making unverified HTTPS requests is discouraged, and you do so at your own risk. 
