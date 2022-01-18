@@ -69,7 +69,7 @@ class MSXSecurity:
             }
 
             # Create the HTTP pool and configure the cache.
-            self._http = urllib3.PoolManager(headers=headers)
+            self._http = urllib3.PoolManager(headers=headers, cert_reqs='CERT_NONE')
             if config.cache_enabled:
                 self._cache = TTLCache(maxsize=1024, ttl=config.cache_ttl_seconds)
 
