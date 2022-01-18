@@ -16,7 +16,7 @@ setup(
     packages=find_packages(),
     python_requires=">=3.0",
     install_requires=[
-        "urllib3==1.24.1",
+        "urllib3==1.26.5",
         "cachetools==4.2.2",
         "requests==2.25.1"
     ],
