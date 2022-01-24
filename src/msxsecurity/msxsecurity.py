@@ -6,6 +6,7 @@ import base64
 import http.client
 import json
 import sys
+import ssl
 
 import urllib3
 from cachetools import TTLCache
@@ -39,11 +40,13 @@ class MSXSecurityConfig:
                  sso_url: str,
                  client_id: str,
                  client_secret: str,
+                 ssl_verify=True,
                  cache_enabled=False,
                  cache_ttl_seconds=300):
         self.sso_url = sso_url
         self.client_id = client_id
         self.client_secret = client_secret
+        self.ssl_verify = ssl_verify
         self.cache_enabled = cache_enabled
         self.cache_ttl_seconds = cache_ttl_seconds
 
@@ -69,7 +72,13 @@ class MSXSecurity:
             }
 
             # Create the HTTP pool and configure the cache.
-            self._http = urllib3.PoolManager(headers=headers, cert_reqs='CERT_NONE')
+            cert_reqs = ssl.CERT_REQUIRED
+            if (not config.ssl_verify):
+                cert_reqs = ssl.CERT_NONE
+                urllib3.disable_warnings()
+
+            self._http = urllib3.PoolManager(headers=headers, cert_reqs=cert_reqs)
+
             if config.cache_enabled:
                 self._cache = TTLCache(maxsize=1024, ttl=config.cache_ttl_seconds)
 
